@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CS NPS Dashboard</title>
+
+<style>
+:root{
+    --lg-red:#C10933;
+    --bg:#F3F4F6;
+    --card:#FFFFFF;
+    --text:#1F2937;
+    --muted:#6B7280;
+    --shadow:0 4px 12px rgba(0,0,0,.08);
+}
+
+*{box-sizing:border-box;}
+body{
+    margin:0;
+    font-family:'Segoe UI',Arial,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+}
+
+.container{
+    max-width:1400px;
+    margin:0 auto;
+    padding:24px;
+}
+
+.header{
+    margin-bottom:20px;
+}
+
+.header h1{
+    margin:0;
+    font-size:28px;
+}
+
+.header p{
+    margin:8px 0 0;
+    color:var(--muted);
+}
+
+.kpi-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:16px;
+    margin-bottom:24px;
+}
+
+.card{
+    background:var(--card);
+    border-radius:16px;
+    padding:20px;
+    box-shadow:var(--shadow);
+}
+
+.kpi-label{
+    color:var(--muted);
+    font-size:14px;
+    margin-bottom:10px;
+}
+
+.kpi-value{
+    font-size:34px;
+    font-weight:700;
+    color:var(--lg-red);
+}
+
+.chart-card{
+    background:#fff;
+    border-radius:16px;
+    padding:20px;
+    box-shadow:var(--shadow);
+    margin-bottom:24px;
+}
+
+.chart-title{
+    font-size:18px;
+    font-weight:700;
+    margin-bottom:14px;
+}
+
+svg{
+    width:100%;
+    height:auto;
+    overflow:visible;
+}
+
+.tooltip{
+    position:fixed;
+    display:none;
+    background:#111827;
+    color:#fff;
+    padding:8px 12px;
+    border-radius:8px;
+    font-size:13px;
+    pointer-events:none;
+    z-index:1000;
+    white-space:nowrap;
+    box-shadow:0 4px 12px rgba(0,0,0,.25);
+}
+
+.footer-note{
+    text-align:right;
+    color:var(--muted);
+    font-size:12px;
+}
+
+@media(max-width:768px){
+    .kpi-value{
+        font-size:28px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <div class="header">
+        <h1>CS 고객만족도(NPS) 대시보드</h1>
+        <p>주차별 서비스 접수 및 고객 만족도 현황</p>
+    </div>
+
+    <div class="kpi-grid">
+
+        <div class="card">
+            <div class="kpi-label">총 접수건수</div>
+            <div class="kpi-value">1,000</div>
+        </div>
+
+        <div class="card">
+            <div class="kpi-label">완료건수</div>
+            <div class="kpi-value">972</div>
+        </div>
+
+        <div class="card">
+            <div class="kpi-label">평균 처리일수</div>
+            <div class="kpi-value">3.21일</div>
+        </div>
+
+        <div class="card">
+            <div class="kpi-label">평균 NPS 점수</div>
+            <div class="kpi-value">8.18</div>
+        </div>
+
+    </div>
+
+    <div class="chart-card">
+        <div class="chart-title">제품 카테고리별 평균 NPS 점수</div>
+        <svg id="barChart" viewBox="0 0 1000 420"></svg>
+    </div>
+
+    <div class="chart-card">
+        <div class="chart-title">주차별 접수건수 추이 (19~25주차)</div>
+        <svg id="lineChart" viewBox="0 0 1000 420"></svg>
+    </div>
+
+    <div class="footer-note">
+        LG Red Theme Dashboard
+    </div>
+
+</div>
+
+<div id="tooltip" class="tooltip"></div>
+
+<script>
+const productData = [
+  {category:"올레드 TV", score:8.72},
+  {category:"트롬 세탁기", score:8.63},
+  {category:"오브제 청소기", score:8.60},
+  {category:"디오스 냉장고", score:8.56},
+  {category:"그램 노트북", score:8.47},
+  {category:"프라엘 뷰티", score:8.23},
+  {category:"휘센 에어컨", score:6.16}
+];
+
+const weeklyData = [
+  {week:"19주차", count:149},
+  {week:"20주차", count:156},
+  {week:"21주차", count:150},
+  {week:"22주차", count:154},
+  {week:"23주차", count:141},
+  {week:"24주차", count:158},
+  {week:"25주차", count:26}
+];
+
+const tooltip = document.getElementById("tooltip");
+
+function showTooltip(e,text){
+    tooltip.style.display="block";
+    tooltip.innerHTML=text;
+    tooltip.style.left=(e.clientX+12)+"px";
+    tooltip.style.top=(e.clientY-10)+"px";
+}
+
+function hideTooltip(){
+    tooltip.style.display="none";
+}
+
+function drawBarChart(){
+
+    const svg = document.getElementById("barChart");
+
+    const W=1000;
+    const H=420;
+
+    const left=80;
+    const right=40;
+    const top=40;
+    const bottom=80;
+
+    const chartW=W-left-right;
+    const chartH=H-top-bottom;
+
+    const minScore=Math.min(...productData.map(d=>d.score));
+    const maxScale=10;
+
+    productData.forEach((d,i)=>{
+
+        const bw=90;
+        const gap=30;
+
+        const x=left+i*(bw+gap);
+        const h=(d.score/maxScale)*chartH;
+        const y=H-bottom-h;
+
+        const color=d.score===minScore
+            ? "#EF4444"
+            : "#C10933";
+
+        const bar=document.createElementNS("http://www.w3.org/2000/svg","rect");
+        bar.setAttribute("x",x);
+        bar.setAttribute("y",y);
+        bar.setAttribute("width",bw);
+        bar.setAttribute("height",h);
+        bar.setAttribute("rx","8");
+        bar.setAttribute("fill",color);
+
+        bar.addEventListener("mousemove",(e)=>{
+            showTooltip(e,
+                `<strong>${d.category}</strong><br>평균 NPS : ${d.score.toFixed(2)}`
+            );
+        });
+
+        bar.addEventListener("mouseleave",hideTooltip);
+
+        svg.appendChild(bar);
+
+        const value=document.createElementNS("http://www.w3.org/2000/svg","text");
+        value.setAttribute("x",x+bw/2);
+        value.setAttribute("y",y-10);
+        value.setAttribute("text-anchor","middle");
+        value.setAttribute("font-size","14");
+        value.setAttribute("font-weight","700");
+        value.textContent=d.score.toFixed(1);
+        svg.appendChild(value);
+
+        const label=document.createElementNS("http://www.w3.org/2000/svg","text");
+        label.setAttribute("x",x+bw/2);
+        label.setAttribute("y",H-35);
+        label.setAttribute("text-anchor","middle");
+        label.setAttribute("font-size","13");
+        label.textContent=d.category;
+        svg.appendChild(label);
+    });
+
+    const axis=document.createElementNS("http://www.w3.org/2000/svg","line");
+    axis.setAttribute("x1",left);
+    axis.setAttribute("y1",H-bottom);
+    axis.setAttribute("x2",W-right);
+    axis.setAttribute("y2",H-bottom);
+    axis.setAttribute("stroke","#999");
+    svg.appendChild(axis);
+}
+
+function drawLineChart(){
+
+    const svg=document.getElementById("lineChart");
+
+    const W=1000;
+    const H=420;
+
+    const left=70;
+    const right=40;
+    const top=40;
+    const bottom=60;
+
+    const chartW=W-left-right;
+    const chartH=H-top-bottom;
+
+    const max=Math.max(...weeklyData.map(d=>d.count));
+
+    let points=[];
+
+    weeklyData.forEach((d,i)=>{
+
+        const x=left+i*(chartW/(weeklyData.length-1));
+        const y=H-bottom-(d.count/max)*chartH;
+
+        points.push(`${x},${y}`);
+
+        const circle=document.createElementNS("http://www.w3.org/2000/svg","circle");
+        circle.setAttribute("cx",x);
+        circle.setAttribute("cy",y);
+        circle.setAttribute("r",6);
+        circle.setAttribute("fill","#C10933");
+
+        circle.addEventListener("mousemove",(e)=>{
+            showTooltip(e,
+                `<strong>${d.week}</strong><br>접수건수 : ${d.count}건`
+            );
+        });
+
+        circle.addEventListener("mouseleave",hideTooltip);
+
+        svg.appendChild(circle);
+
+        const label=document.createElementNS("http://www.w3.org/2000/svg","text");
+        label.setAttribute("x",x);
+        label.setAttribute("y",H-20);
+        label.setAttribute("text-anchor","middle");
+        label.setAttribute("font-size","13");
+        label.textContent=d.week;
+        svg.appendChild(label);
+
+        const value=document.createElementNS("http://www.w3.org/2000/svg","text");
+        value.setAttribute("x",x);
+        value.setAttribute("y",y-12);
+        value.setAttribute("text-anchor","middle");
+        value.setAttribute("font-size","12");
+        value.setAttribute("font-weight","700");
+        value.textContent=d.count;
+        svg.appendChild(value);
+    });
+
+    const poly=document.createElementNS("http://www.w3.org/2000/svg","polyline");
+    poly.setAttribute("points",points.join(" "));
+    poly.setAttribute("fill","none");
+    poly.setAttribute("stroke","#C10933");
+    poly.setAttribute("stroke-width","4");
+    poly.setAttribute("stroke-linejoin","round");
+    poly.setAttribute("stroke-linecap","round");
+
+    svg.insertBefore(poly,svg.firstChild);
+
+    const axis=document.createElementNS("http://www.w3.org/2000/svg","line");
+    axis.setAttribute("x1",left);
+    axis.setAttribute("y1",H-bottom);
+    axis.setAttribute("x2",W-right);
+    axis.setAttribute("y2",H-bottom);
+    axis.setAttribute("stroke","#999");
+
+    svg.appendChild(axis);
+}
+
+drawBarChart();
+drawLineChart();
+</script>
+
+</body>
+</html>
